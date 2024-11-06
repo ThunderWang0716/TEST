@@ -1,0 +1,532 @@
+Sub CopyGroupedRowsToNewSheets()
+    Dim wsSource As Worksheet
+    Dim wsDest As Worksheet
+    Dim headerRow As Variant
+    Dim lastRow As Long
+    Dim groupStartRow As Long
+    Dim fullValue As String
+    Dim groupValue As String
+    Dim groupData As Variant
+    
+    wbName = InputBox("请输入工作簿名称（包括扩展名，例如：门店利润中心报表 - 实际.xlsx）：", "工作簿名称", "门店利润中心报表 - 实际 (11).xlsx")
+    wsName = InputBox("请输入工作表名称：", "工作表名称", "SAPUI5 Export")
+
+    ' 设置源工作表
+    Set wbSource = Workbooks(wbName) ' 替换为实际工作簿名称
+    Set wsSource = wbSource.Sheets(wsName) ' 源工作表
+    lastRow = wsSource.Cells(wsSource.Rows.Count, 1).End(xlUp).row
+
+    ' 获取第一行作为通用表头
+    headerRow = wsSource.Rows(1).Value
+
+    Application.ScreenUpdating = False ' 关闭屏幕更新
+    Application.Calculation = xlCalculationManual ' 关闭自动计算
+
+    ' 从第2行开始，每126行作为一组
+    For groupStartRow = 2 To lastRow Step 126
+        ' 获取当前组的第一个单元格作为工作表名称
+       fullValue = wsSource.Cells(groupStartRow, 1).Value
+       groupValue = Split(fullValue, " (")(0) ' 进行分割
+
+        ' 创建新工作表
+        On Error Resume Next ' 忽略错误以处理名称冲突
+        Set wsDest = wbSource.Sheets(groupValue)
+        On Error GoTo 0
+        
+        If wsDest Is Nothing Then
+            ' 创建新工作表
+            Set wsDest = wbSource.Sheets.Add(After:=wbSource.Sheets(wbSource.Sheets.Count))
+            wsDest.Name = groupValue ' 设置工作表名称
+        End If
+        
+        ' 设置通用表头
+        wsDest.Rows(1).Value = headerRow
+        
+        ' 获取当前组的数据
+        groupData = wsSource.Range(wsSource.Cells(groupStartRow, 1), _
+                                    wsSource.Cells(Application.Min(groupStartRow + 125, lastRow), _
+                                    wsSource.Columns.Count)).Value
+        
+        ' 将数据赋值到新工作表
+        wsDest.Cells(wsDest.Rows.Count, 1).End(xlUp).Offset(1, 0).Resize(UBound(groupData, 1), UBound(groupData, 2)).Value = groupData
+
+        ' 格式化新工作表
+        FormatNewSheet wsDest
+
+        ' 释放对象
+        Set wsDest = Nothing
+    Next groupStartRow
+
+    Application.Calculation = xlCalculationAutomatic ' 恢复自动计算
+    Application.ScreenUpdating = True ' 恢复屏幕更新
+End Sub
+
+Sub FormatNewSheet(ws As Worksheet)
+    ' 在新工作表中插入标题
+    ws.Rows("1:1").Insert Shift:=xlDown, CopyOrigin:=xlFormatFromLeftOrAbove
+    ws.Range("B1").Value = ws.Name & " 利润表"
+    
+    ' 删除第一列
+    ws.Columns("A:A").Delete Shift:=xlToLeft
+    
+    
+    ' 设置A1单元格格式
+    With ws.Range("A1:N1")
+        .Font.Name = "微软雅黑"
+        .Font.Size = 20
+        .Font.Bold = True
+        .Merge
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+    
+    ' 设置颜色
+    Dim rowsToColorYellow As Variant
+    rowsToColorYellow = Array(3, 12, 28, 29, 30, 31, 36, 122, 123, 124, 125, 126, 127, 128)
+    
+    Dim rowsToColorLightYellow As Variant
+    rowsToColorLightYellow = Array(13, 21, 37, 68, 69, 73, 85, 88, 98, 99, 102, 103, 104)
+    
+    Dim rowsToColorLightCream As Variant
+    rowsToColorLightCream = Array(38, 50, 61, 77)
+    
+    Dim i As Long
+    
+    ' 设置颜色为 #FFFF00
+    For i = LBound(rowsToColorYellow) To UBound(rowsToColorYellow)
+        ws.Rows(rowsToColorYellow(i)).Range("A1:N1").Interior.Color = RGB(255, 255, 0) ' #FFFF00
+    Next i
+    
+    ' 设置颜色为 #FFFF80
+    For i = LBound(rowsToColorLightYellow) To UBound(rowsToColorLightYellow)
+        ws.Rows(rowsToColorLightYellow(i)).Range("A1:N1").Interior.Color = RGB(255, 255, 128) ' #FFFF80
+    Next i
+    
+    ' 设置颜色为 #FFFFC0
+    For i = LBound(rowsToColorLightCream) To UBound(rowsToColorLightCream)
+        ws.Rows(rowsToColorLightCream(i)).Range("A1:N1").Interior.Color = RGB(255, 255, 192) ' #FFFFC0
+    Next i
+
+    ' 设置第2行到第128行的字体为宋体
+    ws.Range("A2:N155").Font.Name = "宋体"
+    
+    ' 设置第2行到第128行的B列到N列单元格为居中
+    'ws.Range("B2:N128").HorizontalAlignment = xlCenter
+    
+    ' 设置第3行到第128行的B列单元格颜色为 #FFFF00
+    ws.Range("B3:B128").Interior.Color = RGB(255, 255, 0) ' #FFFF00
+    
+    ' 设置第2行到第128行的A列到N列单元格为所有框线
+    ws.Range("A2:N128").Borders.LineStyle = xlContinuous
+    
+        ' 设置列宽
+    ws.Columns("A:A").ColumnWidth = 32.89
+    ws.Columns("B:B").ColumnWidth = 18
+    ws.Columns("C:N").ColumnWidth = 16.44
+
+    ' 设置行高
+    ws.Rows(1).RowHeight = 27
+    ws.Rows(2).RowHeight = 15
+    ws.Rows("3:" & ws.Rows.Count).RowHeight = 15
+
+    ' 第二行第一列加粗
+    ws.Cells(2, 1).Font.Bold = True
+
+    ' 在第一行上面和下面插入新行，行高设为15
+    ws.Rows(1).Insert
+    ws.Rows(3).Insert
+    ws.Rows(1).RowHeight = 15
+    ws.Rows(3).RowHeight = 15
+
+    ' 设置单元格值
+    ws.Cells(1, 1).Value = "项目名称："
+    ws.Cells(1, 2).Value = ws.Name
+    ws.Cells(1, 1).Font.Name = "宋体"
+    ws.Cells(1, 2).Font.Name = "宋体"
+    
+    With ws.Range("B1").Borders(xlEdgeBottom)
+    .LineStyle = xlContinuous
+    .Weight = xlThin ' You can change this to xlMedium or xlThick for a different weight
+    .ColorIndex = 0 ' Default color (black)
+    End With
+
+    
+     ' 冻结前两列和前四行
+    ws.Activate
+    ws.Range("C5").Select
+    ActiveWindow.FreezePanes = True
+    
+    '冻结第五列
+    ws.Columns("E:E").Select
+    ActiveWindow.FreezePanes = True
+
+
+    ' 设置第五行 B 列到第 155 行 N 列格式为小数点 2 位，右对齐
+    ws.Range("B5:N155").NumberFormat = "0.00"
+    ws.Range("B5:N155").HorizontalAlignment = xlRight
+    
+    '设置粗边框 '
+   With ws.Range("A3:N3").Borders(xlEdgeBottom)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+   End With
+
+    
+    With ws.Range("A130:N130").Borders(xlEdgeBottom)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+    End With
+    
+   With ws.Range("N4").Borders(xlEdgeRight)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+   End With
+   
+  With ws.Range("N130").Borders(xlEdgeRight)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+   End With
+   
+   ' 下面开始报表比例设置
+    
+    Dim col As Integer
+    Dim row As Integer
+    Dim colLetter As String
+
+    ' 从第 131 行到第 150 行的每一行填充公式
+    For row = 131 To 155
+        For col = 2 To 14 ' B 列到 N 列对应的列号为 2 到 14
+            colLetter = Split(ws.Cells(1, col).Address, "$")(1) ' 获取当前列字母
+
+            ' 为每一行的每一列设置公式占位，您可以填充内容
+            Select Case row
+            
+              '(一) 剔除集团管理费用后净利利润
+              
+                Case 131
+                   With ws.Range("A131")
+                      .Value = "剔除集团管理费用后净利润"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlRight
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=" & colLetter & "130+" & colLetter & "35+" & colLetter & "22-" & colLetter & "12" '公式
+                    
+                    ws.Range("A131:N131").Font.Color = RGB(255, 0, 0)
+                    
+                '(二) 校验，暂不处理
+                
+                 Case 132
+                    With ws.Range("A132")
+                      .Value = "校验"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlRight
+                    End With
+                    
+                    ws.Cells(row, col).Formula = 0 '公式
+                    
+                '（三）盈亏平衡点
+                
+                 Case 133
+                    With ws.Range("A133")
+                      .Value = "盈亏平衡点"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=(" & colLetter & "23+" & colLetter & "33+" & colLetter & "38+" & colLetter & "124-" & colLetter & "35)/IF(" & colLetter & "5=0,1,(1-(" & colLetter & "15+" & colLetter & "35)/" & colLetter & "5))"
+                    
+                 '(四) 边际贡献
+                
+                 Case 134
+                    With ws.Range("A134")
+                      .Value = "边际贡献"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=" & colLetter & "5-" & colLetter & "15-" & colLetter & "35" '公式
+                    
+                '(五) 边际贡献
+                
+                 Case 135
+                    With ws.Range("A135")
+                      .Value = "边际贡献率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,"""",(" & colLetter & "5-" & colLetter & "15-" & colLetter & "35)/" & colLetter & "5)"
+
+                 '(六) 成本率
+                
+                 Case 136
+                    With ws.Range("A136")
+                      .Value = "成本率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "14/" & colLetter & "5)"
+                    
+                 '(七)  其中：原材料成本率
+                
+                 Case 137
+                    With ws.Range("A137")
+                      .Value = " 其中：原材料成本率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "15/" & colLetter & "5)"
+                    
+                '(八)  　（一）经营性餐饮
+                
+                 Case 138
+                    With ws.Range("A138")
+                      .Value = "　（一）经营性餐饮"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "6=0,""""," & colLetter & "16/" & colLetter & "6)"
+                    
+                '(九)  　（二）送餐餐饮
+                
+                 Case 139
+                    With ws.Range("A139")
+                      .Value = "　（二）送餐餐饮"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "7=0,""""," & colLetter & "17/" & colLetter & "7)"
+                    
+                 '(十)  　（三）服务性管理
+                
+                 Case 140
+                    With ws.Range("A140")
+                      .Value = "　（三）服务性管理"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "8=0,""""," & colLetter & "18/" & colLetter & "8)"
+                    
+                 '(十一)  　（四）合作商
+                
+                 Case 141
+                    With ws.Range("A141")
+                      .Value = "　（四）合作商"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "9=0,""""," & colLetter & "19/" & colLetter & "9)"
+                    
+                 '(十二)  　 （五）商品销售
+                
+                 Case 142
+                    With ws.Range("A142")
+                      .Value = "　（五）商品销售"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "10=0,""""," & colLetter & "20/" & colLetter & "10)"
+                    
+                 '(十三)  　 （六）食材销售
+                
+                 Case 143
+                    With ws.Range("A143")
+                      .Value = "　（六）食材销售"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "11=0,""""," & colLetter & "21/" & colLetter & "11)"
+                    
+                '(十四)  　  人工成本率
+                
+                 Case 144
+                    With ws.Range("A144")
+                      .Value = " 人工成本率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "23/" & colLetter & "5)"
+                    
+                 '(十四)  　  （一）经营性餐饮
+                
+                 Case 145
+                    With ws.Range("A145")
+                      .Value = "　（一）经营性餐饮"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "6=0,""""," & colLetter & "24/" & colLetter & "6)"
+                    
+                '(十五)  　  　（二）送餐餐饮
+                
+                 Case 146
+                    With ws.Range("A146")
+                      .Value = "　（二）送餐餐饮"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "7=0,""""," & colLetter & "25/" & colLetter & "7)"
+                    
+                '(十六)  　  　（三）服务性管理
+                
+                 Case 147
+                    With ws.Range("A147")
+                      .Value = "　（三）服务性管理"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "8=0,""""," & colLetter & "26/" & colLetter & "8)"
+                    
+                 '(十七)  　  　（四）合作商
+                
+                 Case 148
+                    With ws.Range("A148")
+                      .Value = "　（四）合作商"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "9=0,""""," & colLetter & "27/" & colLetter & "9)"
+                    
+                 '(十八)  　  　（五）商品销售
+                
+                 Case 149
+                    With ws.Range("A149")
+                      .Value = "　（五）商品销售"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "10=0,""""," & colLetter & "28/" & colLetter & "10)"
+                    
+                 '(十九)  　  　（六）食材销售
+                
+                 Case 150
+                    With ws.Range("A150")
+                      .Value = "　（六）食材销售"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "11=0,""""," & colLetter & "29/" & colLetter & "11)"
+                    
+                 '(二十)  　  　 人员费用率
+                
+                 Case 151
+                    With ws.Range("A151")
+                      .Value = " 人员费用率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,"""",(" & colLetter & "23+" & colLetter & "39)/" & colLetter & "5)"
+                    
+                 '(二十一)  　  　不可控费用率
+                
+                 Case 152
+                    With ws.Range("A152")
+                      .Value = " 不可控费用率 "
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "33/" & colLetter & "5)"
+                    
+                  '(二十二)  　  　可控费用率
+                
+                 Case 153
+                    With ws.Range("A153")
+                      .Value = " 可控费用率 "
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "38/" & colLetter & "5)"
+                    
+                 '(二十三)  　  　 毛利率
+                
+                 Case 154
+                    With ws.Range("A154")
+                      .Value = " 毛利率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,"""",(" & colLetter & "5-" & colLetter & "14)/" & colLetter & "5)"
+                    
+                 '(二十四)  　  　 净利润率
+                
+                 Case 155
+                    With ws.Range("A155")
+                      .Value = " 净利润率"
+                      .Font.Name = "宋体"
+                      .Font.Size = 11
+                      .HorizontalAlignment = xlLeft
+                    End With
+                    
+                    ws.Cells(row, col).Formula = "=IF(" & colLetter & "5=0,""""," & colLetter & "130/" & colLetter & "5)"
+                    
+                    
+            End Select
+        Next col
+    Next row
+    
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
